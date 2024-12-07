@@ -6,6 +6,7 @@
 
 #define LINE_BUFFER_MIN 2
 #define LINES_BUFFER_MIN 2
+#define SCROLL_PADDING 5
 
 int max(int a, int b) {
 	return a > b ? a : b;
@@ -102,13 +103,15 @@ int main(int argc, char *argv[]) {
 		init_pair(COLOR_BW, COLOR_BLACK, COLOR_WHITE);
 		init_pair(COLOR_GRAY, 8, COLOR_BLACK);
 	}
-
+	
+	//initialize screen info
 	int screenWidth, screenHeight;
 	int line = 0;
 	int goalCol = 0;
 	int col = 0;
 	getmaxyx(stdscr, screenHeight, screenWidth);
 	wchar_t input = 0;
+	int scroll = 0;
 
 	do { 
 		if (input == KEY_LEFT) {
@@ -124,25 +127,32 @@ int main(int argc, char *argv[]) {
 		} else if (input == KEY_DOWN) {
 			line++;
 		} else if (input == 'q') {
-			endwin();
-			exit(0);
+			break;
 		}
+
 		//bound cursor
+		int displayRowStart = 1; //make room for file banner
 		line = min(line, linesCount);
 		line = max(0, line);
 		col = min(goalCol, tab_strlen(fileContents[line]) - 1);
 		col = max(0, col);
 
+		if (line - scroll >= screenHeight - displayRowStart - SCROLL_PADDING) {
+			scroll = min(line - (screenHeight - displayRowStart - SCROLL_PADDING), linesCount - 1);
+		}
+		if (line - scroll < SCROLL_PADDING) {
+			scroll = max(line - SCROLL_PADDING, 0);
+		}
+
 		//render file text
-		int displayRowStart = 1; //make room for file banner
 		int lineW = (int) log10((double) linesCount) + 2; //make room for line numbers
 		int linesUntil = min(linesCount, screenHeight) + displayRowStart;
 		for (int i = 0; i < linesUntil; i++) {
-			mvprintw(i + displayRowStart, lineW, "%.*s", screenWidth - lineW, fileContents[i]);
+			mvprintw(i + displayRowStart, lineW, "%.*s", screenWidth - lineW, fileContents[i + scroll]);
 		}
 		attron(COLOR_PAIR(COLOR_GRAY));
 		for (int i = 0; i < linesUntil; i++) {
-			mvprintw(i + displayRowStart, 0, "%*d ", lineW - 1, i + 1);
+			mvprintw(i + displayRowStart, 0, "%*d ", lineW - 1, i + 1 + scroll);
 		}
 		attroff(COLOR_PAIR(COLOR_GRAY));
 
@@ -159,7 +169,7 @@ int main(int argc, char *argv[]) {
 		refresh();
 		//display cursor
 		curs_set(1);
-		move(line + displayRowStart, col + lineW);
+		move(line + displayRowStart - scroll, col + lineW);
 
 		input = getch();
 	} while (1);
