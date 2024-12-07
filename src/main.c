@@ -3,11 +3,7 @@
 #include <ncurses.h>
 #include <string.h>
 #include <math.h>
-
-#define LINE_BUFFER_MIN 2
-#define LINES_BUFFER_MIN 2
-#define SCROLL_PADDING 5
-#define TAB_WIDTH 8
+#include "constants.h"
 
 int max(int a, int b) {
 	return a > b ? a : b;
@@ -18,11 +14,11 @@ int min(int a, int b) {
 }
 
 size_t tab_strlen(const char *str) {
-	size_t len = 0;
-	for (int i = 0; i < strlen(str); i++) {
-		len += str[i] == '\t' ? 4 : 1;
-	}
-	return len;
+    size_t len = 0;
+    for (int i = 0; i < strlen(str); i++) {
+        len += str[i] == '\t' ? TAB_WIDTH : 1;
+    }
+    return len;
 }
 
 void tab_mvprintw(int y, int x, int tabOffset, const char *format, ...) {
@@ -42,6 +38,23 @@ void tab_mvprintw(int y, int x, int tabOffset, const char *format, ...) {
 		}
 	}
 }
+
+size_t tab_strlenTo(const char *str, int col) {
+    size_t len = 0;
+    for (int i = 0; i < min(tab_strlen(str), col); i += str[i] == '\t' ? TAB_WIDTH : 1) {
+        len++;
+    }
+    return len;
+}
+
+size_t tab_strlenFrom(const char *str, int col) {
+    size_t len = 0;
+    for (int i = 0; i < min(strlen(str), col); i++) {
+        len += str[i] == '\t' ? TAB_WIDTH : 1;
+    }
+    return len;
+}
+
 
 char** readFileToCharArray(FILE* file, int* numLines, int* numChars) {
 	int charCount = 0;
@@ -108,14 +121,9 @@ int main(int argc, char *argv[]) {
 	noecho();
 	cbreak();
 	keypad(stdscr, 1);
-	int COMMAND_MODE = 0;
-	int EDIT_MODE = 1;
-	int REPLACE_MODE = 2;
 	curs_set(0);
 
 	//initialize colors
-	int COLOR_BW = 1;
-	int COLOR_GRAY = 2;
 	int colorMode = has_colors();
 	if (colorMode) {
 		start_color();
@@ -127,35 +135,56 @@ int main(int argc, char *argv[]) {
 	int screenWidth, screenHeight;
 	int line = 0;
 	int goalCol = 0;
-	int col = 0;
+	int colDisp = 0;
+	int colActual = 0;
 	getmaxyx(stdscr, screenHeight, screenWidth);
 	wchar_t input = 0;
 	int scroll = 0;
 
+	//main loop
 	do {
 		erase();
-		if (input == KEY_LEFT) {
-			col--;
-			goalCol = col;
-		} else if (input == KEY_RIGHT) {
-			if (col < tab_strlen(fileContents[line]) - 1) {
-				col++;
-				goalCol = max(col, goalCol);
-			}
-		} else if (input == KEY_UP) {
-			line--;
-		} else if (input == KEY_DOWN) {
-			line++;
-		} else if (input == 'q') {
-			break;
+		switch (input) {
+			case KEY_LEFT:
+				if (fileContents[line][colActual] != '\t') {
+					colDisp--;
+				} else {
+					colDisp -= 8;
+				}
+				goalCol = colDisp;
+				break;
+			case KEY_RIGHT:
+				if (fileContents[line][colActual] != '\t') {
+					colDisp++;
+				} else {
+					colDisp += 8;
+				}
+				goalCol = max(colDisp, goalCol);
+				break;
+			case KEY_UP:
+				line--;
+				break;
+			case KEY_DOWN:
+				line++;
+				break;
+			case KEY_PPAGE:
+				line -= screenHeight;
+				break;
+			case KEY_NPAGE:
+				line += screenHeight;
+				break;
 		}
+
+		if (input == 'q') break;
 
 		//bound cursor
 		int displayRowStart = 1; //make room for file banner
 		line = min(line, linesCount - 1);
 		line = max(0, line);
-		col = min(goalCol, tab_strlen(fileContents[line]) - 1);
-		col = max(0, col);
+		colDisp = min(goalCol, tab_strlen(fileContents[line]) - 1);
+		colDisp = max(0, colDisp);
+		colActual = tab_strlenTo(fileContents[line], colDisp);
+		colDisp = tab_strlenFrom(fileContents[line], colActual);
 
 		if (line - scroll >= screenHeight - displayRowStart - SCROLL_PADDING) {
 			scroll = min(line - (screenHeight - displayRowStart - SCROLL_PADDING), linesCount - 1);
@@ -191,12 +220,14 @@ int main(int argc, char *argv[]) {
 			mvaddch(bannerRow, i, fillChar);
 		}
 		mvprintw(bannerRow, 0, "WTE %s %dL %dC", targetFileName, linesCount, charsCount);
+		mvprintw(bannerRow, screenWidth-16, "%4d:%4d-%4d", line, colDisp, colActual);
 		attroff(COLOR_PAIR(COLOR_BW));
 
 		refresh();
+
 		//display cursor
 		curs_set(1);
-		move(line + displayRowStart - scroll, col + lineW);
+		move(line + displayRowStart - scroll, colDisp + lineW);
 
 		input = getch();
 	} while (1);

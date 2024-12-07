@@ -1,0 +1,11 @@
+		double	realign
+	
+text	0	1		2			longer text	final text
+
+\t\tdouble\trealign
+\t
+text\t0\t1\t\t2\t\t\tlonger text\tfinal text
+
+                double  realign
+        
+text    0       1               2                       longer text     final text
