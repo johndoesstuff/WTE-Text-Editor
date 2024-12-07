@@ -2,9 +2,10 @@
 #include <stdlib.h>
 #include <ncurses.h>
 #include <string.h>
+#include <math.h>
 
-#define LINE_BUFFER_MIN 64
-#define LINES_BUFFER_MIN 64
+#define LINE_BUFFER_MIN 2
+#define LINES_BUFFER_MIN 2
 
 int max(int a, int b) {
 	return a > b ? a : b;
@@ -12,6 +13,14 @@ int max(int a, int b) {
 
 int min(int a, int b) {
 	return a < b ? a : b;
+}
+
+size_t tab_strlen(const char *str) {
+	size_t len = 0;
+	for (int i = 0; i < strlen(str); i++) {
+		len += str[i] == '\t' ? 4 : 1;
+	}
+	return len;
 }
 
 char** readFileToCharArray(FILE* file, int* numLines, int* numChars) {
@@ -78,39 +87,82 @@ int main(int argc, char *argv[]) {
 	initscr();
 	noecho();
 	cbreak();
+	keypad(stdscr, 1);
 	int COMMAND_MODE = 0;
 	int EDIT_MODE = 1;
 	int REPLACE_MODE = 2;
 	curs_set(0);
+
+	//initialize colors
 	int COLOR_BW = 1;
+	int COLOR_GRAY = 2;
 	int colorMode = has_colors();
 	if (colorMode) {
 		start_color();
 		init_pair(COLOR_BW, COLOR_BLACK, COLOR_WHITE);
+		init_pair(COLOR_GRAY, 8, COLOR_BLACK);
 	}
 
 	int screenWidth, screenHeight;
+	int line = 0;
+	int goalCol = 0;
+	int col = 0;
 	getmaxyx(stdscr, screenHeight, screenWidth);
+	wchar_t input = 0;
 
-	//render file text
-	int displayRowStart = 1;
-	int linesUntil = min(linesCount, screenHeight) - displayRowStart;
-	for (int line = 0; line < linesCount; line++) {
-		mvprintw(line + displayRowStart, 0, "%s", fileContents[line]);
-	}
+	do { 
+		if (input == KEY_LEFT) {
+			col--;
+			goalCol = col;
+		} else if (input == KEY_RIGHT) {
+			if (col < tab_strlen(fileContents[line]) - 1) {
+				col++;
+				goalCol = max(col, goalCol);
+			}
+		} else if (input == KEY_UP) {
+			line--;
+		} else if (input == KEY_DOWN) {
+			line++;
+		} else if (input == 'q') {
+			endwin();
+			exit(0);
+		}
+		//bound cursor
+		line = min(line, linesCount);
+		line = max(0, line);
+		col = min(goalCol, tab_strlen(fileContents[line]) - 1);
+		col = max(0, col);
 
-	//render file banner
-	int bannerRow = 0;
-	attron(COLOR_PAIR(COLOR_BW));
-	for (int i = 0; i < screenWidth; i++) {
-		char fillChar = colorMode ? ' ' : 183; //if color not supported use middle dot
-		mvaddch(bannerRow, i, fillChar);
-	}
-	mvprintw(bannerRow, 0, "WTE %s %dL %dC", targetFileName, linesCount, charsCount);
-	attroff(COLOR_PAIR(COLOR_BW));
+		//render file text
+		int displayRowStart = 1; //make room for file banner
+		int lineW = (int) log10((double) linesCount) + 2; //make room for line numbers
+		int linesUntil = min(linesCount, screenHeight) + displayRowStart;
+		for (int i = 0; i < linesUntil; i++) {
+			mvprintw(i + displayRowStart, lineW, "%.*s", screenWidth - lineW, fileContents[i]);
+		}
+		attron(COLOR_PAIR(COLOR_GRAY));
+		for (int i = 0; i < linesUntil; i++) {
+			mvprintw(i + displayRowStart, 0, "%*d ", lineW - 1, i + 1);
+		}
+		attroff(COLOR_PAIR(COLOR_GRAY));
 
-	refresh();
-	getch();
+		//render file banner
+		int bannerRow = 0;
+		attron(COLOR_PAIR(COLOR_BW));
+		for (int i = 0; i < screenWidth; i++) {
+			char fillChar = colorMode ? ' ' : 183; //if color not supported use middle dot
+			mvaddch(bannerRow, i, fillChar);
+		}
+		mvprintw(bannerRow, 0, "WTE %s %dL %dC", targetFileName, linesCount, charsCount);
+		attroff(COLOR_PAIR(COLOR_BW));
+
+		refresh();
+		//display cursor
+		curs_set(1);
+		move(line + displayRowStart, col + lineW);
+
+		input = getch();
+	} while (1);
 	endwin();
 	return 0;
 }
