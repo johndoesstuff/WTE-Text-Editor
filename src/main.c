@@ -5,6 +5,8 @@
 #include <math.h>
 #include "constants.h"
 
+const char *MODES[] = {"COMMAND", "EDIT", "REPLACE"};
+
 int max(int a, int b) {
 	return a > b ? a : b;
 }
@@ -148,6 +150,7 @@ int main(int argc, char *argv[]) {
 		start_color();
 		init_pair(COLOR_BW, COLOR_BLACK, COLOR_WHITE);
 		init_pair(COLOR_GRAY, 8, COLOR_BLACK);
+		init_pair(COLOR_COM, COLOR_GREEN, COLOR_BLACK);
 	}
 	
 	//initialize screen info
@@ -159,6 +162,7 @@ int main(int argc, char *argv[]) {
 	getmaxyx(stdscr, screenHeight, screenWidth);
 	wchar_t input = 0;
 	int scroll = 0;
+	int MODE = 0;
 
 	//main loop
 	do {
@@ -207,6 +211,19 @@ int main(int argc, char *argv[]) {
 			case KEY_NPAGE:
 				line += screenHeight;
 				break;
+			case 27:
+				MODE = COMMAND_MODE;
+		}
+
+		if (MODE == COMMAND_MODE) {
+			switch (input) {
+				case 'e':
+					MODE = EDIT_MODE;
+					break;
+				case 'r':
+					MODE = REPLACE_MODE;
+					break;
+			}
 		}
 
 		if (input == 'q') break;
@@ -255,6 +272,16 @@ int main(int argc, char *argv[]) {
 		mvprintw(bannerRow, 0, "WTE %s %dL %dC", targetFileName, linesCount, charsCount);
 		mvprintw(bannerRow, screenWidth-16, "%4d:%4d-%4d", line, colDisp, colActual);
 		attroff(COLOR_PAIR(COLOR_BW));
+
+		//render command banner
+		int commandRow = screenHeight - 1;
+		attron(COLOR_PAIR(COLOR_COM));
+		for (int i = 0; i < screenWidth; i++) {
+			char fillChar = colorMode ? ' ' : 183; //if color not supported use middle dot
+			mvaddch(commandRow, i, fillChar);
+		}
+		mvprintw(commandRow, 0, "== %s MODE ==", MODES[MODE]);	
+		attroff(COLOR_PAIR(COLOR_COM));
 
 		refresh();
 

@@ -5,6 +5,7 @@
 
 #define COLOR_BW 1
 #define COLOR_GRAY 2
+#define COLOR_COM 3
 
 #define COMMAND_MODE 0
 #define EDIT_MODE 1
