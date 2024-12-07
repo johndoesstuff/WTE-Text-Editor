@@ -13,12 +13,48 @@ int min(int a, int b) {
 	return a < b ? a : b;
 }
 
-size_t tab_strlen(const char *str) {
-    size_t len = 0;
-    for (int i = 0; i < strlen(str); i++) {
-        len += str[i] == '\t' ? TAB_WIDTH : 1;
-    }
-    return len;
+size_t tab_strlen(const char *str, int tabOffset) { //number of displayed columns for a string accounting for tabs
+	size_t len = 0;
+	for (int i = 0; i < strlen(str); i++) { //iterate each character in string
+		char ch = str[i];
+		if (ch == '\t') {
+			int nextTabStop = (((len - tabOffset) / TAB_WIDTH) + 1) * TAB_WIDTH + tabOffset;
+			len = nextTabStop;
+		} else {
+			len++;
+		}
+	}
+	return len;
+}
+
+size_t tab_strlenTo(const char *str, int tabOffset, int col) { //number of actual characters until a displayed column
+	size_t len = 0;
+	int i;
+	for (i = 0; str[i] != '\0'; i++) { //iterate each character in string
+		if (len >= col) break;
+		char ch = str[i];
+		if (ch == '\t') {
+			int nextTabStop = (((len - tabOffset) / TAB_WIDTH) + 1) * TAB_WIDTH + tabOffset;
+			len = nextTabStop;
+		} else {
+			len++;
+		}
+	}
+	return i;
+}
+
+size_t tab_strlenFrom(const char *str, int tabOffset, int col) { //number of displayed columns for a string accounting for tabs
+	size_t len = 0;
+	for (int i = 0; i < col; i++) { //iterate each character in string
+		char ch = str[i];
+		if (ch == '\t') {
+			int nextTabStop = (((len - tabOffset) / TAB_WIDTH) + 1) * TAB_WIDTH + tabOffset;
+			len = nextTabStop;
+		} else {
+			len++;
+		}
+	}
+	return len;
 }
 
 void tab_mvprintw(int y, int x, int tabOffset, const char *format, ...) {
@@ -38,23 +74,6 @@ void tab_mvprintw(int y, int x, int tabOffset, const char *format, ...) {
 		}
 	}
 }
-
-size_t tab_strlenTo(const char *str, int col) {
-    size_t len = 0;
-    for (int i = 0; i < min(tab_strlen(str), col); i += str[i] == '\t' ? TAB_WIDTH : 1) {
-        len++;
-    }
-    return len;
-}
-
-size_t tab_strlenFrom(const char *str, int col) {
-    size_t len = 0;
-    for (int i = 0; i < min(strlen(str), col); i++) {
-        len += str[i] == '\t' ? TAB_WIDTH : 1;
-    }
-    return len;
-}
-
 
 char** readFileToCharArray(FILE* file, int* numLines, int* numChars) {
 	int charCount = 0;
@@ -144,12 +163,16 @@ int main(int argc, char *argv[]) {
 	//main loop
 	do {
 		erase();
+		
+		int lineW = (int) log10((double) linesCount) + 2; //make room for line numbers
+		
 		switch (input) {
 			case KEY_LEFT:
+				colActual--;
 				if (fileContents[line][colActual] != '\t') {
 					colDisp--;
 				} else {
-					colDisp -= 8;
+					colDisp = tab_strlenFrom(fileContents[line], 0, colActual);
 				}
 				goalCol = colDisp;
 				break;
@@ -157,15 +180,18 @@ int main(int argc, char *argv[]) {
 				if (fileContents[line][colActual] != '\t') {
 					colDisp++;
 				} else {
-					colDisp += 8;
+					colDisp = tab_strlenFrom(fileContents[line], 0, colActual + 1);
 				}
+				colActual++;
 				goalCol = max(colDisp, goalCol);
 				break;
 			case KEY_UP:
 				line--;
+				colDisp = min(goalCol, tab_strlen(fileContents[line], 0) - 1);
 				break;
 			case KEY_DOWN:
 				line++;
+				colDisp = min(goalCol, tab_strlen(fileContents[line], 0) - 1);
 				break;
 			case KEY_PPAGE:
 				line -= screenHeight;
@@ -181,10 +207,10 @@ int main(int argc, char *argv[]) {
 		int displayRowStart = 1; //make room for file banner
 		line = min(line, linesCount - 1);
 		line = max(0, line);
-		colDisp = min(goalCol, tab_strlen(fileContents[line]) - 1);
-		colDisp = max(0, colDisp);
-		colActual = tab_strlenTo(fileContents[line], colDisp);
-		colDisp = tab_strlenFrom(fileContents[line], colActual);
+		colActual = min(colActual, strlen(fileContents[line]) - 1);
+		colActual = max(0, colActual);
+		colDisp = tab_strlenFrom(fileContents[line], 0, colActual);
+		colActual = tab_strlenTo(fileContents[line], 0, colDisp);
 
 		if (line - scroll >= screenHeight - displayRowStart - SCROLL_PADDING) {
 			scroll = min(line - (screenHeight - displayRowStart - SCROLL_PADDING), linesCount - 1);
@@ -194,14 +220,13 @@ int main(int argc, char *argv[]) {
 		}
 
 		//render file text
-		int lineW = (int) log10((double) linesCount) + 2; //make room for line numbers
 		int linesUntil = screenHeight - displayRowStart;
 		for (int i = 0; i < linesUntil; i++) {
 			int currentLine = i + scroll;
 			int displayCol = lineW;
 			int currentRow = i + displayRowStart;
 			if (currentLine < linesCount) {
-				tab_mvprintw(currentRow, displayCol, lineW, "%.*s", screenWidth - lineW, fileContents[currentLine]);	
+				tab_mvprintw(currentRow, displayCol, lineW, "%.*s %d", screenWidth - lineW, fileContents[currentLine], tab_strlenFrom(fileContents[currentLine], 0, 2));	
 				attron(COLOR_PAIR(COLOR_GRAY));
 				mvprintw(currentRow, 0, "%*d ", lineW - 1, currentLine + 1);
 				attroff(COLOR_PAIR(COLOR_GRAY));
