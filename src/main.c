@@ -166,24 +166,22 @@ int main(int argc, char *argv[]) {
 
 		//render file text
 		int lineW = (int) log10((double) linesCount) + 2; //make room for line numbers
-		int linesUntil = min(linesCount, screenHeight) - displayRowStart;
+		int linesUntil = screenHeight - displayRowStart;
 		for (int i = 0; i < linesUntil; i++) {
 			int currentLine = i + scroll;
 			int displayCol = lineW;
 			int currentRow = i + displayRowStart;
 			if (currentLine < linesCount) {
-				tab_mvprintw(currentRow, displayCol, lineW, "%.*s", screenWidth - lineW, fileContents[currentLine]);
+				tab_mvprintw(currentRow, displayCol, lineW, "%.*s", screenWidth - lineW, fileContents[currentLine]);	
+				attron(COLOR_PAIR(COLOR_GRAY));
+				mvprintw(currentRow, 0, "%*d ", lineW - 1, currentLine + 1);
+				attroff(COLOR_PAIR(COLOR_GRAY));
 			} else {
 				attron(COLOR_PAIR(COLOR_GRAY));
 				mvprintw(currentRow, displayCol, "~");
 				attroff(COLOR_PAIR(COLOR_GRAY));
 			}
 		}
-		attron(COLOR_PAIR(COLOR_GRAY));
-		for (int i = 0; i < linesUntil; i++) {
-			mvprintw(i + displayRowStart, 0, "%*d ", lineW - 1, i + 1 + scroll);
-		}
-		attroff(COLOR_PAIR(COLOR_GRAY));
 
 		//render file banner
 		int bannerRow = 0;
