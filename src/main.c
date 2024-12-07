@@ -10,6 +10,10 @@ int max(int a, int b) {
 	return a > b ? a : b;
 }
 
+int min(int a, int b) {
+	return a < b ? a : b;
+}
+
 char** readFileToCharArray(FILE* file, int* numLines, int* numChars) {
 	int charCount = 0;
 	int linesCount = 0;
@@ -21,12 +25,9 @@ char** readFileToCharArray(FILE* file, int* numLines, int* numChars) {
 	char* line = malloc(lineSize * sizeof(char));
 
 	int ch;
-	while ((ch = fgetc(file)) != EOF) { //read file character by character (avoid max line length)
+	while ((ch = fgetc(file)) || 1) { //read file character by character (avoid max line length)
 		int newLine = ch == '\n';
-		if (newLine) { //if newline add \0 to line
-			ch = '\0';
-		}
-
+		int eof = ch == EOF;
 		if (lineSize - 1 <= lineCount) { //resize line
 			lineSize *= 2;
 			line = realloc(line, lineSize * sizeof(char));
@@ -35,7 +36,8 @@ char** readFileToCharArray(FILE* file, int* numLines, int* numChars) {
 		line[lineCount] = ch; //add char
 		lineCount++;
 
-		if (newLine) { //increment lines buffers
+		if (newLine || eof) { //increment lines buffers
+			line[lineCount] = '\0'; //terminate line
 			if (linesSize - 1 <= linesCount) { //resize lines
 				linesSize *= 2;
 				lines = realloc(lines, linesSize * sizeof(char*));
@@ -44,13 +46,16 @@ char** readFileToCharArray(FILE* file, int* numLines, int* numChars) {
 			lines[linesCount] = line;
 			linesCount++;
 			
+			if (eof) break;
+
+			lineSize = LINE_BUFFER_MIN;
 			line = malloc(lineSize * sizeof(char)); //start new line
 			charCount += lineCount;
 			lineCount = 0;
 		}
 	}
-	*numLines = linesCount;
-	*numChars = charCount;
+	*numLines = linesCount - 1;
+	*numChars = charCount - 1;
 	return lines;
 }
 
@@ -88,7 +93,11 @@ int main(int argc, char *argv[]) {
 	getmaxyx(stdscr, screenHeight, screenWidth);
 
 	//render file text
-	
+	int displayRowStart = 1;
+	int linesUntil = min(linesCount, screenHeight) - displayRowStart;
+	for (int line = 0; line < linesCount; line++) {
+		mvprintw(line + displayRowStart, 0, "%s", fileContents[line]);
+	}
 
 	//render file banner
 	int bannerRow = 0;
