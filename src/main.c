@@ -7,6 +7,7 @@
 #define LINE_BUFFER_MIN 2
 #define LINES_BUFFER_MIN 2
 #define SCROLL_PADDING 5
+#define TAB_WIDTH 8
 
 int max(int a, int b) {
 	return a > b ? a : b;
@@ -22,6 +23,24 @@ size_t tab_strlen(const char *str) {
 		len += str[i] == '\t' ? 4 : 1;
 	}
 	return len;
+}
+
+void tab_mvprintw(int y, int x, int tabOffset, const char *format, ...) {
+	va_list args;
+	va_start(args, format);
+	char formattedStr[1024];
+	vsnprintf(formattedStr, sizeof(formattedStr), format, args);
+	va_end(args);
+
+	int currentX = x;
+	for (int i = 0; formattedStr[i] != '\0'; i++) {
+		if (formattedStr[i] == '\t') {
+			int nextTabStop = (((currentX - tabOffset) / TAB_WIDTH) + 1) * TAB_WIDTH + tabOffset;
+			currentX = nextTabStop;
+		} else {
+			mvaddch(y, currentX++, formattedStr[i]);
+		}
+	}
 }
 
 char** readFileToCharArray(FILE* file, int* numLines, int* numChars) {
@@ -113,7 +132,8 @@ int main(int argc, char *argv[]) {
 	wchar_t input = 0;
 	int scroll = 0;
 
-	do { 
+	do {
+		erase();
 		if (input == KEY_LEFT) {
 			col--;
 			goalCol = col;
@@ -132,7 +152,7 @@ int main(int argc, char *argv[]) {
 
 		//bound cursor
 		int displayRowStart = 1; //make room for file banner
-		line = min(line, linesCount);
+		line = min(line, linesCount - 1);
 		line = max(0, line);
 		col = min(goalCol, tab_strlen(fileContents[line]) - 1);
 		col = max(0, col);
@@ -146,9 +166,18 @@ int main(int argc, char *argv[]) {
 
 		//render file text
 		int lineW = (int) log10((double) linesCount) + 2; //make room for line numbers
-		int linesUntil = min(linesCount, screenHeight) + displayRowStart;
+		int linesUntil = min(linesCount, screenHeight) - displayRowStart;
 		for (int i = 0; i < linesUntil; i++) {
-			mvprintw(i + displayRowStart, lineW, "%.*s", screenWidth - lineW, fileContents[i + scroll]);
+			int currentLine = i + scroll;
+			int displayCol = lineW;
+			int currentRow = i + displayRowStart;
+			if (currentLine < linesCount) {
+				tab_mvprintw(currentRow, displayCol, lineW, "%.*s", screenWidth - lineW, fileContents[currentLine]);
+			} else {
+				attron(COLOR_PAIR(COLOR_GRAY));
+				mvprintw(currentRow, displayCol, "~");
+				attroff(COLOR_PAIR(COLOR_GRAY));
+			}
 		}
 		attron(COLOR_PAIR(COLOR_GRAY));
 		for (int i = 0; i < linesUntil; i++) {
