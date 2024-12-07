@@ -186,12 +186,20 @@ int main(int argc, char *argv[]) {
 				goalCol = max(colDisp, goalCol);
 				break;
 			case KEY_UP:
-				line--;
-				colDisp = min(goalCol, tab_strlen(fileContents[line], 0) - 1);
+				if (line > 0) {
+					line--;
+					colActual = tab_strlenTo(fileContents[line], 0, goalCol);
+				} else {
+					colActual = 0;
+				}
 				break;
 			case KEY_DOWN:
-				line++;
-				colDisp = min(goalCol, tab_strlen(fileContents[line], 0) - 1);
+				if (line < linesCount - 1) {
+					line++;
+					colActual = tab_strlenTo(fileContents[line], 0, goalCol);
+				} else {
+					colActual = strlen(fileContents[line]);
+				}
 				break;
 			case KEY_PPAGE:
 				line -= screenHeight;
@@ -205,8 +213,8 @@ int main(int argc, char *argv[]) {
 
 		//bound cursor
 		int displayRowStart = 1; //make room for file banner
-		line = min(line, linesCount - 1);
-		line = max(0, line);
+				line = max(0, line);
+				line = min(line, linesCount - 1);
 		colActual = min(colActual, strlen(fileContents[line]) - 1);
 		colActual = max(0, colActual);
 		colDisp = tab_strlenFrom(fileContents[line], 0, colActual);
@@ -226,7 +234,7 @@ int main(int argc, char *argv[]) {
 			int displayCol = lineW;
 			int currentRow = i + displayRowStart;
 			if (currentLine < linesCount) {
-				tab_mvprintw(currentRow, displayCol, lineW, "%.*s %d", screenWidth - lineW, fileContents[currentLine], tab_strlenFrom(fileContents[currentLine], 0, 2));	
+				tab_mvprintw(currentRow, displayCol, lineW, "%.*s", screenWidth - lineW, fileContents[currentLine]);	
 				attron(COLOR_PAIR(COLOR_GRAY));
 				mvprintw(currentRow, 0, "%*d ", lineW - 1, currentLine + 1);
 				attroff(COLOR_PAIR(COLOR_GRAY));
