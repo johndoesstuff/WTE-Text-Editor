@@ -273,6 +273,19 @@ int main(int argc, char *argv[]) {
 					colActual++;
 				}
 				break;
+			case REPLACE_MODE: //no idea why you would use this an stackoverflow doesnt really know either but oh well
+				switch (input) {
+					case KEY_BACKSPACE:
+						colActual--;
+				}
+				if (isprint(input)) {
+					if (colActual < strlen(fileContents[line]) - 1) {
+						removeChar(&fileContents[line], colActual);
+					}
+					insertChar(&fileContents[line], input, colActual);
+					colActual++;
+				}
+				break;
 		}
 
 		//bound cursor
