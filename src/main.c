@@ -166,6 +166,7 @@ int main(int argc, char *argv[]) {
 		init_pair(COLOR_BW, COLOR_BLACK, COLOR_WHITE);
 		init_pair(COLOR_GRAY, 8, COLOR_BLACK);
 		init_pair(COLOR_COM, COLOR_GREEN, COLOR_BLACK);
+		init_pair(COLOR_REP, COLOR_WHITE, COLOR_WHITE);
 	}
 	
 	//initialize screen info
@@ -346,8 +347,17 @@ int main(int argc, char *argv[]) {
 		refresh();
 
 		//display cursor
-		curs_set(1);
-		move(line + displayRowStart - scroll, colDisp + lineW);
+		int cursorRow = line + displayRowStart - scroll;
+		int cursorCol = colDisp + lineW;
+		if (MODE != REPLACE_MODE) {
+			curs_set(1);
+			move(cursorRow, cursorCol);
+		} else {
+			curs_set(0);
+			attron(COLOR_PAIR(COLOR_REP));
+			mvaddch(cursorRow, cursorCol, ' ');
+			attroff(COLOR_PAIR(COLOR_REP));
+		}
 
 		input = getch();
 	} while (1);
