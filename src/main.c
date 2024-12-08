@@ -4,6 +4,8 @@
 #include <string.h>
 #include <math.h>
 #include "constants.h"
+#include <ctype.h>
+#include "tabUtil.h"
 
 const char *MODES[] = {"COMMAND", "EDIT", "REPLACE"};
 
@@ -13,68 +15,6 @@ int max(int a, int b) {
 
 int min(int a, int b) {
 	return a < b ? a : b;
-}
-
-size_t tab_strlen(const char *str, int tabOffset) { //number of displayed columns for a string accounting for tabs
-	size_t len = 0;
-	for (int i = 0; i < strlen(str); i++) { //iterate each character in string
-		char ch = str[i];
-		if (ch == '\t') {
-			int nextTabStop = (((len - tabOffset) / TAB_WIDTH) + 1) * TAB_WIDTH + tabOffset;
-			len = nextTabStop;
-		} else {
-			len++;
-		}
-	}
-	return len;
-}
-
-size_t tab_strlenTo(const char *str, int tabOffset, int col) { //number of actual characters until a displayed column
-	size_t len = 0;
-	int i;
-	for (i = 0; str[i] != '\0'; i++) { //iterate each character in string
-		if (len >= col) break;
-		char ch = str[i];
-		if (ch == '\t') {
-			int nextTabStop = (((len - tabOffset) / TAB_WIDTH) + 1) * TAB_WIDTH + tabOffset;
-			len = nextTabStop;
-		} else {
-			len++;
-		}
-	}
-	return i;
-}
-
-size_t tab_strlenFrom(const char *str, int tabOffset, int col) { //number of displayed columns for a string accounting for tabs
-	size_t len = 0;
-	for (int i = 0; i < col; i++) { //iterate each character in string
-		char ch = str[i];
-		if (ch == '\t') {
-			int nextTabStop = (((len - tabOffset) / TAB_WIDTH) + 1) * TAB_WIDTH + tabOffset;
-			len = nextTabStop;
-		} else {
-			len++;
-		}
-	}
-	return len;
-}
-
-void tab_mvprintw(int y, int x, int tabOffset, const char *format, ...) {
-	va_list args;
-	va_start(args, format);
-	char formattedStr[1024];
-	vsnprintf(formattedStr, sizeof(formattedStr), format, args);
-	va_end(args);
-
-	int currentX = x;
-	for (int i = 0; formattedStr[i] != '\0'; i++) {
-		if (formattedStr[i] == '\t') {
-			int nextTabStop = (((currentX - tabOffset) / TAB_WIDTH) + 1) * TAB_WIDTH + tabOffset;
-			currentX = nextTabStop;
-		} else {
-			mvaddch(y, currentX++, formattedStr[i]);
-		}
-	}
 }
 
 char** readFileToCharArray(FILE* file, int* numLines, int* numChars) {
@@ -122,6 +62,29 @@ char** readFileToCharArray(FILE* file, int* numLines, int* numChars) {
 	return lines;
 }
 
+void insertChar(char** str, char ch, int index) {
+	int len = strlen(*str);
+	if (index > len) {
+		index = len;
+	}
+
+	char *newStr = realloc(*str, len + 2); // +1 for ch +1 for \0
+	*str = newStr;
+
+	memmove(&(*str)[index + 1], &(*str)[index], len - index + 1);
+	(*str)[index] = ch;
+}
+
+void removeChar(char** str, int index) {
+	int len = strlen(*str);
+	if (index >= len) {
+		index = len - 1;
+	}
+	if (index < 0) return;
+
+	memmove(&(*str)[index], &(*str)[index + 1], len - index);
+}
+
 int main(int argc, char *argv[]) {
 
 	//find file
@@ -143,6 +106,7 @@ int main(int argc, char *argv[]) {
 	cbreak();
 	keypad(stdscr, 1);
 	curs_set(0);
+	set_escdelay(25);
 
 	//initialize colors
 	int colorMode = has_colors();
@@ -211,27 +175,41 @@ int main(int argc, char *argv[]) {
 			case KEY_NPAGE:
 				line += screenHeight;
 				break;
-			case 27:
+			case 27: //esc
 				MODE = COMMAND_MODE;
 		}
 
-		if (MODE == COMMAND_MODE) {
-			switch (input) {
-				case 'e':
-					MODE = EDIT_MODE;
-					break;
-				case 'r':
-					MODE = REPLACE_MODE;
-					break;
-			}
+		switch (MODE) {
+			case COMMAND_MODE:
+				switch (input) {
+					case 'e':
+						MODE = EDIT_MODE;
+						break;
+					case 'r':
+						MODE = REPLACE_MODE;
+						break;
+				}
+				break;
+			case EDIT_MODE:
+				switch (input) {
+					case KEY_BACKSPACE:
+						removeChar(&fileContents[line], colActual - 1);
+						colActual--;
+						break;
+				}
+				if (isprint(input)) {
+					insertChar(&fileContents[line], input, colActual);
+					colActual++;
+				}
+				break;
 		}
 
 		if (input == 'q') break;
 
 		//bound cursor
 		int displayRowStart = 1; //make room for file banner
-				line = max(0, line);
-				line = min(line, linesCount - 1);
+		line = max(0, line);
+		line = min(line, linesCount - 1);
 		colActual = min(colActual, strlen(fileContents[line]) - 1);
 		colActual = max(0, colActual);
 		colDisp = tab_strlenFrom(fileContents[line], 0, colActual);
