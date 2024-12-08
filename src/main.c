@@ -75,6 +75,30 @@ void insertChar(char** str, char ch, int index) {
 	(*str)[index] = ch;
 }
 
+void insertLine(char*** lines, int* linesCount, int line, int col) {
+	if (line > *linesCount) {
+		line = *linesCount;
+	}
+
+	*lines = realloc(*lines, (*linesCount + 1) * sizeof(char*));
+	int lineCount = strlen((*lines)[line]);
+
+	for (int i = *linesCount; i > line; i--) { 
+		(*lines)[i] = (*lines)[i - 1];
+	}
+
+	char* newLine = malloc(lineCount - col + 1);
+	strcpy(newLine, &(*lines)[line][col]);
+
+	(*lines)[line] = realloc((*lines)[line], col + 2);
+	(*lines)[line][col] = '\n';
+	(*lines)[line][col + 1] = '\0';
+
+	(*lines)[line+1] = newLine;
+
+	(*linesCount)++;
+}
+
 void removeChar(char** str, int index) {
 	int len = strlen(*str);
 	if (index >= len) {
@@ -83,6 +107,15 @@ void removeChar(char** str, int index) {
 	if (index < 0) return;
 
 	memmove(&(*str)[index], &(*str)[index + 1], len - index);
+}
+
+void removeNewline(char*** lines, int* linesCount, int line) {
+	
+}
+
+void quit() {
+	endwin();
+	exit(0);
 }
 
 int main(int argc, char *argv[]) {
@@ -188,23 +221,37 @@ int main(int argc, char *argv[]) {
 					case 'r':
 						MODE = REPLACE_MODE;
 						break;
+					case 'q':
+						quit();
 				}
 				break;
 			case EDIT_MODE:
 				switch (input) {
 					case KEY_BACKSPACE:
-						removeChar(&fileContents[line], colActual - 1);
-						colActual--;
+						if (colActual != 0) {
+							removeChar(&fileContents[line], colActual - 1);
+							colActual--;
+						} else {
+							removeNewline(&fileContents, &linesCount, line);
+						}
 						break;
+					case KEY_DC:
+						if (colActual < strlen(fileContents[line]) - 1) {
+							removeChar(&fileContents[line], colActual);
+						}
+						break;
+					case '\n':
+						insertLine(&fileContents, &linesCount, line, colActual);
+						line++;
+						colActual = 0;
+
 				}
-				if (isprint(input)) {
+				if (isprint(input) || input == '\t') {
 					insertChar(&fileContents[line], input, colActual);
 					colActual++;
 				}
 				break;
 		}
-
-		if (input == 'q') break;
 
 		//bound cursor
 		int displayRowStart = 1; //make room for file banner
@@ -269,6 +316,6 @@ int main(int argc, char *argv[]) {
 
 		input = getch();
 	} while (1);
-	endwin();
+	quit();
 	return 0;
 }
