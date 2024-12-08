@@ -110,7 +110,25 @@ void removeChar(char** str, int index) {
 }
 
 void removeNewline(char*** lines, int* linesCount, int line) {
+	if (line == 0) return; //cannot move line to -1
+
+	size_t prevLen = strlen((*lines)[line - 1]);
+	size_t currLen = strlen((*lines)[line]);
+
+	(*lines)[line - 1][prevLen - 1] = '\0'; //remove newline
+	prevLen--;
 	
+	(*lines)[line - 1] = realloc((*lines)[line - 1], prevLen + currLen + 1);
+	strcat((*lines)[line - 1], (*lines)[line]);
+
+	free((*lines)[line]);
+
+	for (int i = line; i < *linesCount - 1; i++) {
+		(*lines)[i] = (*lines)[i + 1];
+	}
+
+
+	(*linesCount)--;
 }
 
 void quit() {
@@ -232,7 +250,11 @@ int main(int argc, char *argv[]) {
 							removeChar(&fileContents[line], colActual - 1);
 							colActual--;
 						} else {
-							removeNewline(&fileContents, &linesCount, line);
+							if (line > 0) {
+								colActual = strlen(fileContents[line - 1]) - 1;
+								removeNewline(&fileContents, &linesCount, line);
+								line--;
+							}
 						}
 						break;
 					case KEY_DC:
