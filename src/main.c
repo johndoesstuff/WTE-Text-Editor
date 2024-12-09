@@ -8,6 +8,56 @@
 #include "tabUtil.h"
 
 const char *MODES[] = {"COMMAND", "EDIT", "REPLACE"};
+char *EXTS[] = {
+	"js",
+	"c",
+	"html",
+	"txt",
+	"cpp",
+	"ua",
+	"py",
+	"h",
+	"css",
+	"svg",
+	"md",
+	"csv",
+	"log",
+	"xml",
+	"json",
+	"yaml",
+	"yml",
+	"ini",
+	"java",
+	"ts",
+	"sh",
+	"bat",
+	NULL, //terminate list or some shit idk im lazy
+};
+char *FORMATS[] = {
+	"Javascript",
+	"C",
+	"Hypertext Markup Language",
+	"Text",
+	"C++",
+	"Uiua",
+	"Python",
+	"C Header",
+	"Cascading Style Sheets",
+	"Scalable Vector Graphics",
+	"Markdown",
+	"Comma-Separated Values",
+	"Log",
+	"XML",
+	"JSON",
+	"YAML",
+	"YAML",
+	"INI Configuration",
+	"Java Source",
+	"Typescript",
+	"Shell Script",
+	"Batch",
+	NULL,
+};
 
 int max(int a, int b) {
 	return a > b ? a : b;
@@ -131,6 +181,29 @@ void removeNewline(char*** lines, int* linesCount, int line) {
 	(*linesCount)--;
 }
 
+int indexOf(char** strings, int numStrings, char* str) {
+	for (int i = 0; i < numStrings && strings[i] != NULL; i++) {
+		if (strcmp(strings[i], str) == 0) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+char* getExtensionFromFilename(char* filename) {
+	int len = strlen(filename);
+	for (int i = len - 1; i >= 0; i--) {
+		if (filename[i] == '.') {
+			if (i < len - 1) {
+				return &filename[i + 1];
+			} else {
+				return NULL; //case of "file."
+			}
+		}
+	}
+	return NULL; //no extension
+}
+
 void quit() {
 	endwin();
 	exit(0);
@@ -138,11 +211,23 @@ void quit() {
 
 int main(int argc, char *argv[]) {
 
+	if (argc < 2) {
+		printf("Please provide a filename to edit\n");
+		return 0;
+	}
+
 	//find file
 	char *targetFileName = argv[1];
+	char *targetFileExt = getExtensionFromFilename(targetFileName);
+	char *targetFileType;
+	targetFileType = NULL;
+	if (targetFileExt != NULL) {
+		int index = indexOf(EXTS, 1e4, targetFileExt);
+		targetFileType = FORMATS[index];
+	}
 	FILE *targetFile = fopen(targetFileName, "r+"); //open file for reading/writing
 	if (targetFile == NULL) {
-		printf("Unable to locate file %s", targetFileName);
+		printf("Unable to locate file %s\n", targetFileName);
 		return 0;
 	}
 	
@@ -183,6 +268,7 @@ int main(int argc, char *argv[]) {
 	//main loop
 	do {
 		erase();
+		getmaxyx(stdscr, screenHeight, screenWidth);
 		
 		int lineW = (int) log10((double) linesCount) + 2; //make room for line numbers
 		
@@ -263,7 +349,7 @@ int main(int argc, char *argv[]) {
 							removeChar(&fileContents[line], colActual);
 						}
 						break;
-					case '\n':
+					case '\n': //TODO: auto add tabs to newlines based on previous
 						insertLine(&fileContents, &linesCount, line, colActual);
 						line++;
 						colActual = 0;
@@ -330,8 +416,14 @@ int main(int argc, char *argv[]) {
 			char fillChar = colorMode ? ' ' : 183; //if color not supported use middle dot
 			mvaddch(bannerRow, i, fillChar);
 		}
-		mvprintw(bannerRow, 0, "WTE %s %dL %dC", targetFileName, linesCount, charsCount);
-		mvprintw(bannerRow, screenWidth-16, "%4d:%4d-%4d", line, colDisp, colActual);
+		if (targetFileType != NULL) {
+			mvprintw(bannerRow, 0, "WTE\t%s\t%s File\t%dL\t%dC", targetFileName, targetFileType, linesCount, charsCount);
+		} else if (targetFileExt != NULL) {
+			mvprintw(bannerRow, 0, "WTE\t%s\t%s File\t%dL\t%dC", targetFileName, targetFileExt, linesCount, charsCount);
+		} else {
+			mvprintw(bannerRow, 0, "WTE\t%s\t\t%dL\t%dC", targetFileName, linesCount, charsCount);
+		}
+		mvprintw(bannerRow, screenWidth-24, "\t%d\t%d-%d", line, colDisp, colActual);
 		attroff(COLOR_PAIR(COLOR_BW));
 
 		//render command banner
