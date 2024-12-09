@@ -112,6 +112,17 @@ char** readFileToCharArray(FILE* file, int* numLines, int* numChars) {
 	return lines;
 }
 
+void writeLinesToFile(char* filename, char* lines[], int lineCount) {
+	FILE* file = fopen(filename, "w");
+	for (int i = 0; i < lineCount; i++) {
+		if (fputs(lines[i], file) == EOF) {
+			fclose(file);
+			return;
+		}
+	}
+	fclose(file);
+}
+
 void insertChar(char** str, char ch, int index) {
 	int len = strlen(*str);
 	if (index > len) {
@@ -204,7 +215,8 @@ char* getExtensionFromFilename(char* filename) {
 	return NULL; //no extension
 }
 
-void quit() {
+void quit(FILE* file) {
+	fclose(file);
 	endwin();
 	exit(0);
 }
@@ -235,6 +247,11 @@ int main(int argc, char *argv[]) {
 	int linesCount;
 	int charsCount;
 	char **fileContents = readFileToCharArray(targetFile, &linesCount, &charsCount);
+	if (linesCount == 0 && charsCount == -1) { //completely empty file case
+		strcpy(fileContents[0], "\n");
+		charsCount++;
+		linesCount++;
+	}
 
 	//initialize ncurses
 	initscr();
@@ -264,6 +281,7 @@ int main(int argc, char *argv[]) {
 	wchar_t input = 0;
 	int scroll = 0;
 	int MODE = 0;
+	int SUCCESSFUL_WRITE = 0;
 
 	//main loop
 	do {
@@ -327,7 +345,12 @@ int main(int argc, char *argv[]) {
 						MODE = REPLACE_MODE;
 						break;
 					case 'q':
-						quit();
+						quit(targetFile);
+						break;
+					case 'w':
+						writeLinesToFile(targetFileName, fileContents, linesCount);
+						SUCCESSFUL_WRITE = 1;
+						break;
 				}
 				break;
 			case EDIT_MODE:
@@ -336,41 +359,50 @@ int main(int argc, char *argv[]) {
 						if (colActual != 0) {
 							removeChar(&fileContents[line], colActual - 1);
 							colActual--;
+							charsCount--;
 						} else {
 							if (line > 0) {
 								colActual = strlen(fileContents[line - 1]) - 1;
 								removeNewline(&fileContents, &linesCount, line);
 								line--;
+								charsCount--;
 							}
 						}
 						break;
 					case KEY_DC:
 						if (colActual < strlen(fileContents[line]) - 1) {
 							removeChar(&fileContents[line], colActual);
+							charsCount--;
 						}
 						break;
 					case '\n': //TODO: auto add tabs to newlines based on previous
 						insertLine(&fileContents, &linesCount, line, colActual);
 						line++;
+						charsCount++;
 						colActual = 0;
-
+						break;
 				}
 				if (isprint(input) || input == '\t') {
 					insertChar(&fileContents[line], input, colActual);
 					colActual++;
+					charsCount++;
 				}
 				break;
 			case REPLACE_MODE: //no idea why you would use this an stackoverflow doesnt really know either but oh well
 				switch (input) {
 					case KEY_BACKSPACE:
 						colActual--;
+						colActual = max(colActual, 0);
+						break;
 				}
 				if (isprint(input)) {
 					if (colActual < strlen(fileContents[line]) - 1) {
 						removeChar(&fileContents[line], colActual);
+						charsCount--;
 					}
 					insertChar(&fileContents[line], input, colActual);
 					colActual++;
+					charsCount++;
 				}
 				break;
 		}
@@ -433,7 +465,12 @@ int main(int argc, char *argv[]) {
 			char fillChar = colorMode ? ' ' : 183; //if color not supported use middle dot
 			mvaddch(commandRow, i, fillChar);
 		}
-		mvprintw(commandRow, 0, "== %s MODE ==", MODES[MODE]);	
+		if (SUCCESSFUL_WRITE) {
+			mvprintw(commandRow, 0, "-- WRITE SUCCESSFUL --");
+			SUCCESSFUL_WRITE = 0;	
+		} else {
+			mvprintw(commandRow, 0, "== %s MODE ==", MODES[MODE]);	
+		}
 		attroff(COLOR_PAIR(COLOR_COM));
 
 		refresh();
@@ -453,6 +490,6 @@ int main(int argc, char *argv[]) {
 
 		input = getch();
 	} while (1);
-	quit();
+	quit(targetFile);
 	return 0;
 }
