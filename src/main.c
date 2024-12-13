@@ -215,6 +215,16 @@ char* getExtensionFromFilename(char* filename) {
 	return NULL; //no extension
 }
 
+int getTabCount(char *str) {
+	int len = strlen(str);
+	for (int i = 0; i < len; i++) {
+		if (str[i] != '\t') {
+			return i;
+		}
+	}
+	return len;
+}
+
 void quit(FILE* file) {
 	fclose(file);
 	endwin();
@@ -375,11 +385,15 @@ int main(int argc, char *argv[]) {
 							charsCount--;
 						}
 						break;
-					case '\n': //TODO: auto add tabs to newlines based on previous
+					case '\n':
 						insertLine(&fileContents, &linesCount, line, colActual);
+						int tabs = getTabCount(fileContents[line]); //get tabs of previous line
 						line++;
 						charsCount++;
-						colActual = 0;
+						for (int i = 0; i < tabs; i++) {
+							insertChar(&fileContents[line], '\t', i);
+						}
+						colActual = tabs;
 						break;
 				}
 				if (isprint(input) || input == '\t') {
